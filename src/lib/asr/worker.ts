@@ -2,7 +2,14 @@
  * Speech recognition worker. Runs Whisper on the visitor's own device through
  * WebAssembly, so the audio never leaves the browser.
  */
-import { Tensor, env, pipeline } from "@huggingface/transformers";
+type SpeechRuntime = Pick<typeof import("@huggingface/transformers"), "Tensor" | "env" | "pipeline">;
+/** Load the pinned browser distribution at runtime, alongside the ONNX downloads. */
+const runtimeUrl = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";
+let runtime: Promise<SpeechRuntime> | undefined;
+
+function speechRuntime(): Promise<SpeechRuntime> {
+  return (runtime ??= import(/* webpackIgnore: true */ runtimeUrl));
+}
 
 const RATE = 16000;
 /** Whisper reads at most 30 seconds at a time; stay under it and cut at quiet moments. */
@@ -26,13 +33,13 @@ export type WorkerReply =
 
 const reply = (message: WorkerReply) => (self as unknown as { postMessage(m: WorkerReply): void }).postMessage(message);
 
-env.allowLocalModels = false;
-
 let recognizer: Recognizer | null = null;
 let loaded = "";
 
 async function load(model: string): Promise<Recognizer> {
   if (recognizer && loaded === model) return recognizer;
+  const { env, pipeline } = await speechRuntime();
+  env.allowLocalModels = false;
   // Threads need cross-origin isolation (see next.config.ts and public/_headers).
   const wasm = (env.backends.onnx as { wasm?: { numThreads?: number } }).wasm;
   if (wasm) wasm.numThreads = self.crossOriginIsolated ? Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1)) : 1;
@@ -100,6 +107,7 @@ async function detectLanguage(recognize: Recognizer, audio: Float32Array): Promi
     const languages = config?.lang_to_id;
     const start = config?.decoder_start_token_id;
     if (!languages || start === undefined) return "en";
+    const { Tensor } = await speechRuntime();
     const { input_features } = await recognize.processor(audio);
     const { logits } = await recognize.model({
       input_features,
