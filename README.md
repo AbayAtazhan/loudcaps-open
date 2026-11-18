@@ -4,6 +4,8 @@
 
 Drop in a video, get animated word-by-word captions, export an MP4. No upload, no sign-up, no watermark. Speech recognition and video rendering both happen on your own device.
 
+Created by [AbayAtazhan](https://github.com/AbayAtazhan).
+
 [Open LoudCaps in your browser](https://abayatazhan.github.io/loudcaps-open/)
 
 ![LoudCaps](public/og.png)
